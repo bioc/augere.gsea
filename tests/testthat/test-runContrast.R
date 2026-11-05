@@ -34,7 +34,7 @@ test_that("runContrast works as expected", {
     expect_identical(names(vanilla), c("fry", "camera"))
     lines.def <- readLines(file.path(output.default, "report.Rmd"))
     expect_true(any(grepl("filterByExpr\\(.*group=", lines.def)))
-    expect_true(any(grepl("voomWithQualityWeights", lines.def)))
+    expect_true(any(grepl("sample.weights=TRUE", lines.def)))
     expect_true(any(grepl("robust=TRUE", lines.def)))
     expect_false(any(grepl("trend=FALSE", lines.def)))
 
@@ -117,7 +117,8 @@ test_that("runContrast works for duplicateCorrelation", {
     dupcor <- runContrast(se, sets, group="group", dc.block="block", comparison=c("A", "C"), output=output.dupcor, suppress.plots=TRUE, save.results=FALSE)
 
     lines.dupcor <- readLines(file.path(output.dupcor, "report.Rmd"))
-    expect_true(any(grepl("duplicateCorrelation\\(", lines.dupcor)))
+    expect_true(any(grepl("block=dc.block", lines.dupcor)))
+    expect_true(any(grepl("correlation=fit", lines.dupcor)))
 
     expect_identical(names(vanilla), names(dupcor))
     expect_false(identical(vanilla, dupcor))
@@ -130,7 +131,7 @@ test_that("runContrast works with other limma-related options", {
 
     lines.other <- readLines(file.path(output.other, "report.Rmd"))
     expect_true(any(grepl("trend=TRUE", lines.other)))
-    expect_true(any(grepl("voom\\(", lines.other)))
+    expect_false(any(grepl("sample.weights=TRUE", lines.other)))
     expect_false(any(grepl("robust=TRUE", lines.other)))
 
     expect_identical(names(vanilla), names(other))

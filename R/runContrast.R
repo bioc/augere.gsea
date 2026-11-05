@@ -184,25 +184,24 @@ runContrast <- function(
     replacements$CONTRAST_NAME <- deparse(contrast.info[[1]]$title)
 
     # Now fitting the linear model and EB shrinking.
+    voom.args <- ""
     lm.args <- character(0)
     if (!is.null(dc.block)) {
-        parsed[["voom"]] <- NULL
         replacements$DUPCOR_BLOCK <- deparseToString(dc.block)
-        lm.args <- c("block=dc.block", "correlation=dc$consensus.correlation")
-        replacements$LM_OPTS <- paste(c("", lm.args), collapse=", ")
+        voom.args <- c(voom.args, "block=dc.block")
+        lm.args <- c("block=dc.block", "correlation=fit$correlation")
     } else {
-        parsed[["duplicate-correlation"]] <- NULL
-        replacements$LM_OPTS <- ""
+        parsed[["duplicate-correlation-text"]] <- NULL
+        parsed[["duplicate-correlation-block"]] <- NULL
     }
 
     if (quality) {
-        replacements$VOOM_CMD <- "voomWithQualityWeights"
+        voom.args <- c(voom.args, "sample.weights=TRUE")
     } else {
-        replacements$VOOM_CMD <- "voom"
         parsed[["quality-text"]] <- NULL
     }
 
-    eb.args <- character(0)
+    eb.args <- character(0) 
     if (trend) {
         eb.args <- c(eb.args, "trend=TRUE")
     }
@@ -214,6 +213,8 @@ runContrast <- function(
         replacements$EXTRA_EB_CAPT <- ""
         parsed[["robust-text"]] <- NULL
     }
+
+    replacements$VOOM_ARGS <- paste(voom.args, collapse=", ")
     replacements$EB_OPTS <- paste(c("", eb.args), collapse=", ")
 
     # Setting up some of the outputs.
@@ -321,10 +322,10 @@ runContrast <- function(
         # romer only accepts array weights, so we'll just have to make do.
         extra.args <- character(0)
         if (quality) {
-            extra.args <- c(extra.args, "array.weights=v$targets$sample.weights")
+            extra.args <- c(extra.args, "array.weights=fit$targets$sample.weights")
         }
         if (!is.null(dc.block)) {
-            extra.args <- c(extra.args, "block=dc.block", "correlation=dc$consensus")
+            extra.args <- c(extra.args, "block=dc.block", "correlation=fit$correlation")
         }
 
         save.name <- "save-romer"

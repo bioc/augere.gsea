@@ -92,7 +92,7 @@ The assumption is that most genes not exhibit any differences between samples;
 any systematic differences across many genes are assumed to be technical and removed.
 
 ```{r}
-y <- edgeR::calcNormFactors(y)
+y <- edgeR::normLibSizes(y)
 head(y$samples, 10)
 ```
 
@@ -108,41 +108,38 @@ barplot(y$samples$norm.factors)
 
 # Estimating observation weights 
 
-We use voom to create a empirical mean-variance trend to compute a weight for each observation. 
-In this manner, log-CPMs derived from low counts are downweighted to reflect their lower precision.
-:BEGIN quality-text
-We estimate sample-specific quality weights to reduce the impact of outlier replicates without resorting to their removal.
-:END
-:BEGIN duplicate-correlation
-We use `duplicateCorrelation()` to account for correlations between samples with the same level of blocking factor.
+We use these weights to fit a linear model to the log-CPMs for each gene. 
 
-```{r duplicate-correlation, fig.wide=TRUE}
-library(limma)
-dc.block <- factor(SummarizedExperiment::colData(se)[[<%= DUPCOR_BLOCK %>]])
-
-# Iteratively refine the precision weights after estimating the correlation. 
-v <- limma::<%= VOOM_CMD %>(y, design=design, plot=FALSE)
-dc <- limma::duplicateCorrelation(v, design=design, block=dc.block)
-v <- limma::<%= VOOM_CMD %>(y, design=design, plot=TRUE, block=dc.block, 
-    correlation=dc$consensus.correlation)
-dc <- limma::duplicateCorrelation(v, design=design, block=dc.block)
-
-dc$consensus.correlation
-```
-:END
-
-:BEGIN voom
 ```{r voom}
 library(limma)
-v <- <%= VOOM_CMD %>(y, design=design, plot=TRUE)
+:BEGIN duplicate-correlation-block
+dc.block <- factor(SummarizedExperiment::colData(se)[[<%= DUPCOR_BLOCK %>]])
+:END
+fit <- limma::voomLmFit(y, design=design<%= VOOM_ARGS %>, plot=TRUE)
+```
+
+:BEGIN quality-text
+We set `sample.weights=TRUE` to estimate a "quality weight" for each sample based on its residuals. 
+This reduces the impact of outlier replicates on the model fit without resorting to their removal.
+
+```{r qualweights}
+sw <- fit$targets$sample.weight
+names(sw) <- colnames(y)
+sw <- sort(sw)
+head(sw) # samples with smallest weights are least reliable
+tail(sw) # samples with largest weights are most reliable
 ```
 :END
 
-Once the precision weights are computed, we fit the linear model for each gene. 
+:BEGIN duplicate-correlation-text
+We set `block=` to account for correlations between samples assigned to the same block.
+Specifically, this reduces the contribution of multiple samples from the same block, as they are effectively redundant when the correlation is high.
+Blocking in this manner is a more flexible alternative to blocking directly in the design matrix, at the cost of some more liberal $p$-values.
 
-```{r}
-fit <- lmFit(v<%= LM_OPTS %>)
+```{r dupcor}
+fit$correlation
 ```
+:END
 
 Empirical Bayes shrinkage shares information across genes to stabilize the variance estimates.
 The estimated prior degrees of freedom (d.f.) represents the variability of the variances across genes, typically ranging from 5 to 20.
@@ -226,7 +223,7 @@ The rotations preserve the correlation structure between genes in the same set, 
 ```{r}
 set.seed(<%= SEED %>)
 res.roast <- limma::mroast(
-    v,
+    fit$EList,
     index=indices,
     design=design,
     contrast=con<%= MROAST_ARGS %>
@@ -298,7 +295,7 @@ The speed-up is achieved by making some compromises on how unequal variances bet
 
 ```{r}
 res.fry <- limma::fry(
-    v,
+    fit$EList,
     index=indices,
     design=design,
     contrast=con<%= FRY_ARGS %>
@@ -308,7 +305,7 @@ res.fry <- limma::fry(
 We perform some reformatting for consistency.
 
 ```{r}
-res.fry <- DataFrame(res.fry)
+res.fry <- S4Vectors::DataFrame(res.fry)
 res.fry <- res.fry[match(names(sets), rownames(res.fry)),]
 rownames(res.fry) <- names(sets)
 colnames(res.fry)[colnames(res.fry) == "NGenes"] <- "NumGenes"
@@ -369,7 +366,7 @@ This also estimates and accounts for the variance inflation due to correlations 
 
 ```{r}
 res.camera <- limma::camera(
-    v,
+    fit$EList,
     index=indices,
     design=design,
     contrast=con<%= CAMERA_ARGS %>
@@ -442,7 +439,7 @@ This uses rotation of the residuals to simulate a null distribution in a manner 
 
 ```{r}
 set.seed(<%= SEED %>)
-raw <- limma::romer(v, index=indices, design=design, contrast=con<%= ROMER_ARGS %>)
+raw <- limma::romer(fit$EList$E, index=indices, design=design, contrast=con<%= ROMER_ARGS %>)
 ```
 
 ```{r}

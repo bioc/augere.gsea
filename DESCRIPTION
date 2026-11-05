@@ -1,6 +1,6 @@
 Package: augere.gsea
-Version: 0.99.1
-Date: 2026-04-11
+Version: 0.99.2
+Date: 2026-11-05
 Title: Automatic Generation of Gene Set Enrichment Analyses
 Description:
     Implements pipelines for generating gene set enrichment analysis reports in the augere framework.

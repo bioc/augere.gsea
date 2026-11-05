@@ -103,14 +103,18 @@ resulting in slightly incorrect log-fold changes and/or spurious DE.
 which represent the combined effect of library size differences and composition biases.
 
 ```{r plot-norm-factors}
-barplot(y$samples$norm.factors)
+nf <- y$samples$norm.factors
+names(nf) <- colnames(y)
+nf <- sort(nf)
+head(nf) # samples with lowest factors have more upregulated genes
+tail(nf) # samples with highest factors have fewer upregulated genes
 ```
 
 # Estimating observation weights 
 
 We use these weights to fit a linear model to the log-CPMs for each gene. 
 
-```{r voom}
+```{r voom, fig.cap="Square root of the standard deviation against the mean log-CPM, where each dot represents a gene. The fitted trend is used to estimate observation-level precision weights."}
 library(limma)
 :BEGIN duplicate-correlation-block
 dc.block <- factor(SummarizedExperiment::colData(se)[[<%= DUPCOR_BLOCK %>]])
